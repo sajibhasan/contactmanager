@@ -14,8 +14,14 @@ class ContactsController extends Controller
     private $rules = [
             'name' => ['required', 'min:5'],
             'email' => ['required', 'email'],
-            'company' => ['required']
+            'company' => ['required'],
+            'photo' => ['mimes:jpeg,png,gif,bmp']
         ];
+    private $upload_dir;
+    
+    public function __construct() {
+        $this->upload_dir = base_path().'/public/uploads';
+    }
     
     public function index(Request $request){
         if(($group_id = $request->get("group_id"))){
@@ -55,21 +61,51 @@ class ContactsController extends Controller
     public function store(Request $request) {
         
         $this->validate($request, $this->rules);
-        Contact::create($request->all());
+        $data = $this->get_request($request);
+        Contact::create($data);
         return redirect("contacts")->with("message","Contact Saved!");
     }
     
+    public function get_request(Request $request)
+            
+    {
+        $data = $request->all();
+        
+        if($request->hasFile('photo'))
+        {
+            //get file name
+           $photo = $request->file('photo')->getClientOriginalName();
+
+           //move file to server
+           $destination = $this->upload_dir;
+           $request->file('photo')->move($destination, $photo); 
+           $data['photo'] = $photo;
+        }
+        
+        return $data;
+    }
+
+
     public function update($id, Request $request)
     {
         $this->validate($request, $this->rules);
+        
+       
         $contact = Contact::find($id);
-        $contact->update($request->all());
+        $data = $this->get_request($request);
+        $contact->update($data);
         return redirect("contacts")->with("message","Contact Updated!");
     }
     
     public function destroy($id)
     {
         $contact = Contact::find($id);
+        
+        if(!is_null($contact->photo))
+        {
+            $file_path = $this->upload_dir . '/' . $contact->photo;
+            if(file_exists($file_path)) unlink ($file_path);
+        }
         $contact->delete();
         return redirect("contacts")->with("message","Contact Deleted!");
     }
